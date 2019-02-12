@@ -1,9 +1,17 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
+void execCommand(char **tokens, int numTokens);
+void handleCommand(char *input);
+void handleEnv(char *inupt, int index);
 int countTokens(char *input);
 void tokenize(char *input, int count, char **tokens);
+
+extern char **environ;
 
 int main(int argc, char *argv[]) {
   char *title = getenv("lshprompt") ? getenv("lshprompt") : "lsh>";
@@ -18,39 +26,94 @@ int main(int argc, char *argv[]) {
 
     int index = strcspn(input, "=");
     if (index < strlen(input)) {
-      char var_name[index + 1];
-      memcpy(var_name, input, index);
-
-      char value[strlen(input) - index];
-      memcpy(value, &input[index + 1], strlen(input) - index);
-
-      if (strlen(value) > 0) {
-        setenv(var_name, value, 1);
-      } else {
-        unsetenv(var_name);
-      }
+      handleEnv(input, index);
     } else {
-      if (strcmp(input, "$test") == 0) {
-        char *value = getenv("test") ? getenv("test") : "";
-        // printf("%s\n", value);
-      }
-
-      char input_copy[strlen(input) + 1];
-      strcpy(input_copy, input);
-
-      int numTokens = countTokens(input_copy);
-      strcpy(input_copy, input);
-
-      char *tokens[numTokens];
-      tokenize(input_copy, numTokens, tokens);
-
-      for (int i = 0; i < numTokens; i++) {
-        printf("token %d %s\n", i, tokens[i]);
-      }
+      handleCommand(input);
     }
   }
 
   return 0;
+}
+
+void execCommand (char **tokens, int numTokens) {
+  // printf("Num tokens: %d\n", numTokens);
+  // for (int i = 0; i < numTokens; i++) {
+  //   printf("Token:%s\n", tokens[i]);
+  // }
+
+  // printf("%d %d %d\n", pipedInput, fd[0], fd[1]);
+  // if (pipedInput >= 0) {
+  //   if (pipedInput == 0) dup2(fd[1], 1);
+  //   if (pipedInput == 1) dup2(fd[0], 0);
+  //
+  //   close(fd[0]);
+  //   close(fd[1]);
+  // }
+
+  for (int i = 0; i < numTokens; i++) {
+    if (tokens[i][0] == '$') {
+      char *env_value = getenv(tokens[i] + 1) ? getenv(tokens[i] + 1) : "";
+      tokens[i] = env_value;
+    }
+  }
+
+  pid_t pid = fork();
+  if (pid < 0) {
+    fprintf(stderr, "Unable to create fork.");
+    exit(0);
+  }
+  if (pid == 0) {
+    // dup2(1, 0);
+    int ret = execvpe(tokens[0], tokens, environ);
+    if (ret < 0) printf("lsh: %s: command not found\n", tokens[0]);
+    exit(0);
+  }
+  waitpid(pid, 0, 0);
+}
+
+void handleCommand (char *input) {
+  char input_copy[strlen(input) + 1];
+  strcpy(input_copy, input);
+
+  int numTokens = countTokens(input_copy);
+  strcpy(input_copy, input);
+
+  char *tokens[numTokens + 1];
+  tokenize(input_copy, numTokens, tokens);
+
+  // int fd[2];
+  int index = 0;
+  while (index < numTokens) {
+    if (strcmp(tokens[index], "|") == 0) {
+      tokens[index] = NULL;
+
+      // pipe(fd);
+      execCommand(tokens, index);
+      execCommand(&tokens[index + 1], numTokens - index - 1);
+      return;
+    }
+    index++;
+  }
+
+  execCommand(tokens, numTokens);
+
+  return;
+}
+
+void handleEnv (char *input, int index) {
+  char var_name[index + 1];
+  memcpy(var_name, input, index);
+
+  char value[strlen(input) - index];
+  memcpy(value, &input[index + 1], strlen(input) - index);
+
+  if (strlen(value) > 0) {
+    setenv(var_name, value, 1);
+  } else {
+    unsetenv(var_name);
+  }
+
+  return;
 }
 
 int countTokens(char *input) {
@@ -76,5 +139,7 @@ void tokenize(char *input, int count, char **tokens) {
 
     token = strtok(NULL, delimiter);
   }
+  tokens[count] = NULL;
+
   return;
 }
