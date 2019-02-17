@@ -8,7 +8,8 @@
 #include <readline/history.h>
 
 void execCommand(char **tokens, int numTokens, int pipeIn, int pipeOut, int *fd);
-void handleCommand(char *input);
+int handleBuiltin(char **tokens, int numTokens);
+void handleCommand(char **tokens, int numTokens);
 void handleEnv(char *inupt, int index);
 int countTokens(char *input);
 void tokenize(char *input, int count, char **tokens);
@@ -19,12 +20,21 @@ int main() {
 
   using_history();
   input = readline(title);
-  while(strcmp(input, "exit") != 0) {
+  while(1) {
+    char input_copy[strlen(input) + 1];
+    strcpy(input_copy, input);
+
+    int numTokens = countTokens(input_copy);
+    strcpy(input_copy, input);
+
+    char *tokens[numTokens + 1];
+    tokenize(input_copy, numTokens, tokens);
+
     int index = strcspn(input, "=");
     if (index < (int) strlen(input)) {
       handleEnv(input, index);
-    } else {
-      handleCommand(input);
+    } else if (!handleBuiltin(tokens, numTokens)) {
+      handleCommand(tokens, numTokens);
     }
     add_history(input);
     free(input);
@@ -35,7 +45,7 @@ int main() {
   return 0;
 }
 
-void execCommand (char **tokens, int numTokens, int pipeIn, int pipeOut, int *fd) {
+void execCommand(char **tokens, int numTokens, int pipeIn, int pipeOut, int *fd) {
   // printf("Num tokens: %d\n", numTokens);
   // for (int i = 0; i < numTokens; i++) {
   //   printf("Token:%s\n", tokens[i]);
@@ -72,16 +82,19 @@ void execCommand (char **tokens, int numTokens, int pipeIn, int pipeOut, int *fd
   }
 }
 
-void handleCommand (char *input) {
-  char input_copy[strlen(input) + 1];
-  strcpy(input_copy, input);
+int handleBuiltin(char **tokens, int numTokens) {
+  if (numTokens == 0) {
+  } else if (strcmp(tokens[0], "exit") == 0) {
+    exit(0);
+  } else if (strcmp(tokens[0], "cd") == 0) {
+    chdir(numTokens >= 2 ? tokens[1] : "~");
+  } else {
+    return 0;
+  }
+  return 1;
+}
 
-  int numTokens = countTokens(input_copy);
-  strcpy(input_copy, input);
-
-  char *tokens[numTokens + 1];
-  tokenize(input_copy, numTokens, tokens);
-
+void handleCommand(char **tokens, int numTokens) {
   int end = numTokens;
   int pipeIn = -1;
   int pipeOut = -1;
@@ -111,7 +124,7 @@ void handleCommand (char *input) {
   return;
 }
 
-void handleEnv (char *input, int index) {
+void handleEnv(char *input, int index) {
   char var_name[index + 1];
   memcpy(var_name, input, index);
 
