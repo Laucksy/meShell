@@ -7,27 +7,27 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
-void execCommand(char **tokens, int numTokens, int *fd, int pipedInput);
+void execCommand(char **tokens, int numTokens, int pipeIn, int pipeOut, int *fd);
 void handleCommand(char *input);
 void handleEnv(char *inupt, int index);
 int countTokens(char *input);
 void tokenize(char *input, int count, char **tokens);
 
-extern char **environ;
-
-int main(int argc, char *argv[]) {
+int main() {
   char *title = getenv("lshprompt") ? getenv("lshprompt") : "lsh>";
-  size_t size = 1;
   char *input;
 
+  using_history();
   input = readline(title);
   while(strcmp(input, "exit") != 0) {
     int index = strcspn(input, "=");
-    if (index < strlen(input)) {
+    if (index < (int) strlen(input)) {
       handleEnv(input, index);
     } else {
       handleCommand(input);
     }
+    add_history(input);
+    free(input);
 
     input = readline(title);
   }
@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-void execCommand (char **tokens, int numTokens, int *fd, int pipedInput) {
+void execCommand (char **tokens, int numTokens, int pipeIn, int pipeOut, int *fd) {
   // printf("Num tokens: %d\n", numTokens);
   // for (int i = 0; i < numTokens; i++) {
   //   printf("Token:%s\n", tokens[i]);
@@ -54,16 +54,19 @@ void execCommand (char **tokens, int numTokens, int *fd, int pipedInput) {
     exit(0);
   }
   if (pid == 0) {
-    // printf("%d %d %d\n", pipedInput, fd[0], fd[1]);
-    if (pipedInput >= 0) {
-      if (pipedInput == 0) dup2(fd[1], 1);
-      if (pipedInput == 1) dup2(fd[0], 0);
-
-      close(fd[0]);
-      close(fd[1]);
+    // printf("File Descriptors (%s) (%d): %d %d\n", tokens[0], getpid(), pipeIn, pipeOut);
+    if (pipeIn >= 0) {
+      dup2(pipeIn, 1);
+      close(pipeIn);
     }
+    if (pipeOut >= 0) {
+      dup2(pipeOut, 0);
+      close(pipeOut);
+    }
+    if (fd[0] >= 0) close(fd[0]);
+    if (fd[1] >= 0) close(fd[1]);
 
-    int ret = execvpe(tokens[0], tokens, environ);
+    int ret = execvp(tokens[0], tokens);
     if (ret < 0) printf("lsh: %s: command not found\n", tokens[0]);
     exit(0);
   }
@@ -79,26 +82,32 @@ void handleCommand (char *input) {
   char *tokens[numTokens + 1];
   tokenize(input_copy, numTokens, tokens);
 
-  int fd[2];
-  int index = 0;
-  while (index < numTokens) {
-    if (strcmp(tokens[index], "|") == 0) {
-      tokens[index] = NULL;
+  int end = numTokens;
+  int pipeIn = -1;
+  int pipeOut = -1;
+  for (int i = numTokens - 1; i > 0; i--) {
+    if (strcmp(tokens[i], "|") == 0) {
+      tokens[i] = NULL;
 
+      int fd[2];
       pipe(fd);
-      execCommand(&tokens[index + 1], numTokens - index - 1, fd, 1);
-      execCommand(tokens, index, fd, 0);
-      close(fd[0]);
-      close(fd[1]);
+      pipeOut = fd[0];
 
-      while (wait(NULL) > 0);
-      return;
+      execCommand(&tokens[i + 1], end - i - 1, pipeIn, pipeOut, fd);
+      end = i;
+
+      close(pipeIn);
+      pipeIn = fd[1];
+      pipeOut = -1;
+      close(pipeOut);
     }
-    index++;
   }
 
-  execCommand(tokens, numTokens, fd, -1);
-  wait(NULL);
+  int fd[2] = {pipeIn, pipeOut};
+  execCommand(tokens, end, pipeIn, pipeOut, fd);
+  if (pipeIn >= 0) close(pipeIn);
+
+  while (wait(NULL) > 0);
   return;
 }
 
