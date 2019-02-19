@@ -1,12 +1,19 @@
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <signal.h>
 
 #include "parse.h"
 #include "execute.h"
+#include "handlers.h"
 
 int main() {
   char *title = getenv("lshprompt") ? getenv("lshprompt") : "lsh>";
   char *input;
+
+  signal(SIGINT, handleSIGINT);
+  signal(SIGTSTP, handleSIGTSTP);
+  signal(SIGCONT, handleSIGCONT);
+  signal(SIGCHLD, handleSIGCHLD);
 
   using_history();
   input = readline(title);
