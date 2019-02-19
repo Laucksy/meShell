@@ -1,6 +1,5 @@
 #include "execute.h"
-
-int job_table_len = 0;
+#include "jobs.h"
 
 int execCommand(char **tokens, int numTokens, int pipeIn, int pipeOut, int *fd) {
   // printf("Num tokens: %d\n", numTokens);
@@ -10,11 +9,11 @@ int execCommand(char **tokens, int numTokens, int pipeIn, int pipeOut, int *fd) 
 
   int cmd_length = 0;
   for (int i = 0; i < numTokens; i++) {
-    cmd_length += (int) strlen(tokens[i]);
     if (tokens[i][0] == '$') {
       char *env_value = getenv(tokens[i] + 1) ? getenv(tokens[i] + 1) : "";
       tokens[i] = env_value;
     }
+    cmd_length += (int) strlen(tokens[i]);
   }
 
   pid_t pid = fork();
@@ -54,50 +53,15 @@ int execCommand(char **tokens, int numTokens, int pipeIn, int pipeOut, int *fd) 
   return pid;
 }
 
-void add_to_table(int pid, char *cmd) {
-  time_t cur_time;
-  time(&cur_time);
-  char *status = "exec";
-
-  char *test = malloc((strlen(cmd) + 1) * sizeof(char));
-  for (int i = 0; i < (int) strlen(cmd); i++) test[i] = cmd[i];
-  test[(int) strlen(cmd)] = '\0';
-
-  // printf("Add to jobs table: %d ,%s, %d %s\n", pid, test, (int) cur_time, &(*status));
-  job_table[job_table_len].pid = pid;
-  job_table[job_table_len].status = status;
-  job_table[job_table_len].start = cur_time;
-  job_table[job_table_len].end = cur_time;
-  job_table[job_table_len].cmd = test;
-  job_table_len++;
-}
-
-void alter_table_ended(int pid, int ret) {
-  // printf("ended %d %d\n", pid, ret);
-  time_t cur_time;
-  time(&cur_time);
-  char *status = ret == 0 ? "ok" : "error";
-
-  for (int i = 0; i < job_table_len; i++) {
-    if (job_table[i].pid == pid) job_table[i].status = status;
-  }
-}
-
 int handleBuiltin(char **tokens, int numTokens) {
-  if (numTokens == 0) {
-  } else if (strcmp(tokens[0], "exit") == 0) {
-    exit(0);
-  } else if (strcmp(tokens[0], "cd") == 0) {
-    chdir(numTokens >= 2 ? tokens[1] : "~");
-  } else if (strcmp(tokens[0], "jsum") == 0) {
-    printf("PID\tStatus\tTime\tCMD\n");
-    for (int i = 0; i < job_table_len; i++) {
-      struct job j = job_table[i];
-      printf("%d\t%s\t%d\t%s\n", (int) j.pid, j.status, (int) j.end - j.start, j.cmd);
-    }
-  } else {
-    return 0;
-  }
+  if (numTokens == 0) {}
+  else if (strcmp(tokens[0], "exit") == 0) clean_table_and_exit();
+  else if (strcmp(tokens[0], "cd") == 0) chdir(numTokens >= 2 ? tokens[1] : "~");
+  else if (strcmp(tokens[0], "jsum") == 0) print_jsum();
+  else if (strcmp(tokens[0], "jobs") == 0) print_jobs();
+  else if (strcmp(tokens[0], "bg") == 0) resume_job(tokens[1], 1);
+  else if (strcmp(tokens[0], "fg") == 0) resume_job(tokens[1], 0);
+  else return 0;
   return 1;
 }
 
@@ -136,6 +100,19 @@ void handleCommand(char **tokens, int numTokens) {
 
   int fd[2] = {pipeIn, pipeOut};
   int pid = execCommand(tokens, end, pipeIn, pipeOut, fd);
+
+  setpgid(pid, pid);
+
+  for (int i = 0; i < numPids; i++) {
+    if (pids[i]) {
+      setpgid(pids[i], pid);
+    }
+  }
+
+  fg_pgid = bg ? 0 : getpgid(pid);
+  // printf("PGID: %d\n", fg_pgid);
+
+  // printf("Exec: %d %d\n", bg, pid);
   if (!bg) {
     pids[numPids] = pid;
     numPids++;
@@ -145,10 +122,17 @@ void handleCommand(char **tokens, int numTokens) {
   for (int i = 0; i < numPids; i++) {
     if (pids[i]) {
       int status;
-      waitpid(pids[i], &status, 0);
-      alter_table_ended(pids[i], status);
+      printf("Wait: %d %d\n", pids[i], WUNTRACED);
+      waitpid(pids[i], &status, WUNTRACED);
+      printf("Got Wait: %d\n", status);
+
+      if (WIFEXITED(status)) {
+        if (getpgid(pids[i]) == fg_pgid) fg_pgid = 0;
+        alter_table_ended(pids[i], status);
+      }
     }
   }
+  printf("return\n");
   return;
 }
 

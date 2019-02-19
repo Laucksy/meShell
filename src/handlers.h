@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 
 void handleSIGINT(int sig);
 void handleSIGTSTP(int sig);
