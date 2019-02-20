@@ -2,13 +2,18 @@
 #include "jobs.h"
 
 void handleSIGINT(int sig) {
-  printf("SIGINT CALLED %d\n", sig);
+  // printf("SIGINT CALLED %d\n", sig);
+  (void)sig;
+
   if (fg_pgid > 0) kill(-1 * fg_pgid, SIGINT);
+  alter_table_ended(fg_pgid, 2);
   return;
 }
 
 void handleSIGTSTP(int sig) {
-  printf("SIGTSTP CALLED %d %d\n", sig, fg_pgid);
+  // printf("SIGTSTP CALLED %d %d\n", sig, fg_pgid);
+  (void)sig;
+
   if (fg_pgid > 0) kill(-1 * fg_pgid, SIGTSTP);
   alter_table_changed(fg_pgid, 0);
   return;
@@ -25,11 +30,11 @@ void handleSIGCHLD(int sig) {
   (void)sig;
 
   int status;
-  pid_t pid = wait(&status);
+  pid_t pid = waitpid(-1, &status, WNOHANG);
 
-  while (pid != -1) {
+  while (pid > 0) {
     alter_table_ended(pid, status);
-    pid = wait(&status);
+    pid = waitpid(-1, &status, WNOHANG);
   }
 
   return;

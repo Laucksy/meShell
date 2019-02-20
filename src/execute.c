@@ -100,6 +100,7 @@ void handleCommand(char **tokens, int numTokens) {
 
   int fd[2] = {pipeIn, pipeOut};
   int pid = execCommand(tokens, end, pipeIn, pipeOut, fd);
+  if (pipeIn >= 0) close(pipeIn);
 
   setpgid(pid, pid);
 
@@ -110,29 +111,26 @@ void handleCommand(char **tokens, int numTokens) {
   }
 
   fg_pgid = bg ? 0 : getpgid(pid);
-  // printf("PGID: %d\n", fg_pgid);
-
-  // printf("Exec: %d %d\n", bg, pid);
   if (!bg) {
     pids[numPids] = pid;
     numPids++;
   }
-  if (pipeIn >= 0) close(pipeIn);
 
   for (int i = 0; i < numPids; i++) {
     if (pids[i]) {
       int status;
-      printf("Wait: %d %d\n", pids[i], WUNTRACED);
-      waitpid(pids[i], &status, WUNTRACED);
-      printf("Got Wait: %d\n", status);
+      // printf("Wait: %d %d\n", pids[i], WUNTRACED);
+      int ret = waitpid(pids[i], &status, WUNTRACED);
+      // printf("Got Wait: %d %d %d %d %d\n", status, ret, WIFEXITED(status), WIFSIGNALED(status), WIFSTOPPED(status));
 
-      if (WIFEXITED(status)) {
-        if (getpgid(pids[i]) == fg_pgid) fg_pgid = 0;
-        alter_table_ended(pids[i], status);
-      }
+      if (getpgid(pids[i]) == fg_pgid) fg_pgid = 0;
+
+      if (WIFEXITED(status) && ret != 0) alter_table_ended(pids[i], 1); // error
+      else if (WIFSIGNALED(status)) alter_table_ended(pids[i], 2); // abort
+      else if (!WIFSTOPPED(status)) alter_table_ended(pids[i], 0);
     }
   }
-  printf("return\n");
+  // printf("return\n");
   return;
 }
 
