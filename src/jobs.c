@@ -21,6 +21,12 @@ void add_to_table(int pid, char *cmd) {
   for (int i = 0; i < (int) strlen(cmd); i++) test[i] = cmd[i];
   test[(int) strlen(cmd)] = '\0';
 
+  sigset_t mask, prevMask;
+  // Set up mask to indicate SIGCHLD should be blocked
+  sigemptyset(&mask);
+  sigaddset(&mask, SIGCHLD);
+  sigprocmask(SIG_BLOCK, &mask, &prevMask); // Disable SIGCHLD Signal
+
   // Initialize values in struct
   job_table[job_table_ind].pid = pid;
   job_table[job_table_ind].status = status;
@@ -37,6 +43,10 @@ void add_to_table(int pid, char *cmd) {
   if (job_table_len >= JOB_TABLE_MAX) {
     job_table_base = job_table_ind % JOB_TABLE_MAX;
   }
+
+  sigprocmask(SIG_SETMASK, &prevMask, NULL); // Enable SIGCHLD Signal
+
+  return;
 }
 
 /*
@@ -58,10 +68,18 @@ void alter_table_ended(int pid, int ret, int return_status) {
 
   for (int i = 0; i < JOB_TABLE_MAX; i++) {
     if (job_table[i].pid == pid) {
+      sigset_t mask, prevMask;
+      // Set up mask to indicate SIGCHLD should be blocked
+      sigemptyset(&mask);
+      sigaddset(&mask, SIGCHLD);
+      sigprocmask(SIG_BLOCK, &mask, &prevMask); // Disable SIGCHLD Signal
+
       job_table[i].status = status;
       job_table[i].end = cur_time;
       fg_pgid = 0;
       tcsetpgrp(0, getpgrp()); // Give foreground back to shell
+
+      sigprocmask(SIG_SETMASK, &prevMask, NULL); // Enable SIGCHLD Signal
     }
   }
 }
@@ -76,7 +94,15 @@ void alter_table_changed(int pgid, int running) {
 
   for (int i = 0; i < JOB_TABLE_MAX; i++) {
     if (getpgid(job_table[i].pid) == pgid) {
+      sigset_t mask, prevMask;
+      // Set up mask to indicate SIGCHLD should be blocked
+      sigemptyset(&mask);
+      sigaddset(&mask, SIGCHLD);
+      sigprocmask(SIG_BLOCK, &mask, &prevMask); // Disable SIGCHLD Signal
+
       job_table[i].status = status;
+
+      sigprocmask(SIG_SETMASK, &prevMask, NULL); // Enable SIGCHLD Signal
     }
   }
 }
