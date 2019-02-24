@@ -10,9 +10,10 @@ int main() {
   char *title = getenv("lshprompt") ? getenv("lshprompt") : "lsh>";
   char *input;
 
-  signal(SIGINT, handleSIGINT);
-  signal(SIGTSTP, handleSIGTSTP);
-  signal(SIGCONT, handleSIGCONT);
+  signal(SIGINT, SIG_IGN);
+  signal(SIGTSTP, SIG_IGN);
+  signal(SIGTTIN, SIG_IGN);
+  signal(SIGTTOU, SIG_IGN);
   signal(SIGCHLD, handleSIGCHLD);
 
   using_history();

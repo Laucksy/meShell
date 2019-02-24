@@ -34,6 +34,12 @@ int execCommand(char **tokens, int numTokens, int pipeIn, int pipeOut, int *fd) 
     if (fd[0] >= 0) close(fd[0]);
     if (fd[1] >= 0) close(fd[1]);
 
+    signal(SIGINT, SIG_DFL);
+    signal(SIGTSTP, SIG_DFL);
+    signal(SIGTTIN, SIG_DFL);
+    signal(SIGTTOU, SIG_DFL);
+    signal(SIGCHLD, SIG_DFL);
+
     int ret = execvp(tokens[0], tokens);
     if (ret < 0) {
       printf("lsh: %s: command not found\n", tokens[0]);
@@ -87,8 +93,7 @@ void handleCommand(char **tokens, int numTokens) {
       pipe(fd);
       pipeOut = fd[0];
 
-      pids[numPids] = execCommand(&tokens[i + 1], end - i - 1, pipeIn, pipeOut, fd);
-      numPids++;
+      pids[numPids++] = execCommand(&tokens[i + 1], end - i - 1, pipeIn, pipeOut, fd);
       end = i;
 
       close(pipeIn);
@@ -102,35 +107,7 @@ void handleCommand(char **tokens, int numTokens) {
   int pid = execCommand(tokens, end, pipeIn, pipeOut, fd);
   if (pipeIn >= 0) close(pipeIn);
 
-  setpgid(pid, pid);
-
-  for (int i = 0; i < numPids; i++) {
-    if (pids[i]) {
-      setpgid(pids[i], pid);
-    }
-  }
-
-  fg_pgid = bg ? 0 : getpgid(pid);
-  if (!bg) {
-    pids[numPids] = pid;
-    numPids++;
-  }
-
-  for (int i = 0; i < numPids; i++) {
-    if (pids[i]) {
-      int status;
-      // printf("Wait: %d %d\n", pids[i], WUNTRACED);
-      waitpid(pids[i], &status, WUNTRACED);
-      // printf("Got Wait: %d %d %d %d\n", status, WIFEXITED(status), WIFSIGNALED(status), WIFSTOPPED(status));
-
-      if (getpgid(pids[i]) == fg_pgid) fg_pgid = 0;
-
-      if (WIFEXITED(status) && status != 0) alter_table_ended(pids[i], 1); // error
-      else if (WIFSIGNALED(status)) alter_table_ended(pids[i], 2); // abort
-      else if (!WIFSTOPPED(status)) alter_table_ended(pids[i], 0);
-    }
-  }
-  // printf("return\n");
+  handleProcessControl(pids, numPids, pid, bg);
   return;
 }
 
@@ -145,6 +122,36 @@ void handleEnv(char *input, int index) {
     setenv(var_name, value, 1);
   } else {
     unsetenv(var_name);
+  }
+
+  return;
+}
+
+void handleProcessControl(int *pids, int numPids, int rootPid, int bg) {
+  fg_pgid = bg ? 0 : rootPid;
+  tcsetpgrp(0, fg_pgid);
+  pids[numPids++] = rootPid;
+
+  for (int i = numPids - 1; i >= 0; i--) {
+    if (pids[i]) {
+      setpgid(pids[i], rootPid);
+    }
+  }
+
+  for (int i = 0; i < numPids; i++) {
+    if (!bg && pids[i]) {
+      int status;
+      // printf("Wait: %d %d\n", pids[i], WUNTRACED);
+      waitpid(pids[i], &status, WUNTRACED);
+      tcsetpgrp(0, getpgrp());
+      // printf("Got Wait: %d %d %d %d\n", status, WIFEXITED(status), WIFSIGNALED(status), WIFSTOPPED(status));
+
+      // if (getpgid(pids[i]) == fg_pgid) fg_pgid = 0;
+
+      if (WIFEXITED(status) && status != 0) alter_table_ended(pids[i], 1, status); // error
+      else if (WIFSIGNALED(status)) alter_table_ended(pids[i], 2, status); // abort
+      else if (!WIFSTOPPED(status)) alter_table_ended(pids[i], 0, status);
+    }
   }
 
   return;

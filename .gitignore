@@ -1,4 +1,4 @@
-install/bin/*
+install/*
 
 # Prerequisites
 *.d

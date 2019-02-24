@@ -19,7 +19,7 @@ struct job job_table[JOB_TABLE_MAX];
 int fg_pgid;
 
 void add_to_table(int pid, char *cmd);
-void alter_table_ended(int pid, int status);
+void alter_table_ended(int pid, int ret, int return_status);
 void alter_table_changed(int pgid, int running);
 void clean_table_and_exit();
 

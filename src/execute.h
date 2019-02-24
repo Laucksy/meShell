@@ -9,3 +9,4 @@ int execCommand(char **tokens, int numTokens, int pipeIn, int pipeOut, int *fd);
 int handleBuiltin(char **tokens, int numTokens);
 void handleCommand(char **tokens, int numTokens);
 void handleEnv(char *input, int index);
+void handleProcessControl(int *pids, int numPids, int rootPid, int bg);
