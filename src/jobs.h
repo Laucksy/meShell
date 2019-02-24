@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-#define JOB_TABLE_MAX 5
+#define JOB_TABLE_MAX 1024
 
 struct job {
   int pid;

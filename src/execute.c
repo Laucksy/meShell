@@ -120,12 +120,12 @@ void handleCommand(char **tokens, int numTokens) {
     if (pids[i]) {
       int status;
       // printf("Wait: %d %d\n", pids[i], WUNTRACED);
-      int ret = waitpid(pids[i], &status, WUNTRACED);
-      // printf("Got Wait: %d %d %d %d %d\n", status, ret, WIFEXITED(status), WIFSIGNALED(status), WIFSTOPPED(status));
+      waitpid(pids[i], &status, WUNTRACED);
+      // printf("Got Wait: %d %d %d %d\n", status, WIFEXITED(status), WIFSIGNALED(status), WIFSTOPPED(status));
 
       if (getpgid(pids[i]) == fg_pgid) fg_pgid = 0;
 
-      if (WIFEXITED(status) && ret != 0) alter_table_ended(pids[i], 1); // error
+      if (WIFEXITED(status) && status != 0) alter_table_ended(pids[i], 1); // error
       else if (WIFSIGNALED(status)) alter_table_ended(pids[i], 2); // abort
       else if (!WIFSTOPPED(status)) alter_table_ended(pids[i], 0);
     }

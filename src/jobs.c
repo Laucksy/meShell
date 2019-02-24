@@ -40,8 +40,9 @@ void alter_table_ended(int pid, int ret) {
 
   for (int i = 0; i < JOB_TABLE_MAX; i++) {
     if (job_table[i].pid == pid) {
+      // printf("End jobs table: %d %d %s\n", pid, (int) cur_time, &(*status));
       job_table[i].status = status;
-      job_table[job_table_ind].end = cur_time;
+      job_table[i].end = cur_time;
       fg_pgid = 0;
     }
   }
@@ -82,7 +83,12 @@ void resume_job(char *arg, int bg) {
 
         if (!bg) {
           fg_pgid = pgid;
-          waitpid(j.pid, NULL, WUNTRACED);
+
+          int status;
+          waitpid(j.pid, &status, WUNTRACED);
+          if (WIFEXITED(status) && status != 0) alter_table_ended(j.pid, 1); // error
+          else if (WIFSIGNALED(status)) alter_table_ended(j.pid, 2); // abort
+          else if (!WIFSTOPPED(status)) alter_table_ended(j.pid, 0);
         }
       }
       num_found++;
@@ -94,7 +100,7 @@ void print_jsum() {
   printf("PID\tStatus\tTime\tCMD\n");
   for (int i = 0; i < JOB_TABLE_MAX; i++) {
     struct job j = job_table[(job_table_base + i) % JOB_TABLE_MAX];
-    if (j.cmd != NULL) printf("%d\t%s\t%d\t%s\n", (int) j.pid, j.status, (int) j.end - j.start, j.cmd);
+    if (j.cmd != NULL) printf("%d\t%s\t%d sec\t%s\n", (int) j.pid, j.status, (int) j.end - j.start, j.cmd);
   }
   return;
 }

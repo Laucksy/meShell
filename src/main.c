@@ -36,6 +36,7 @@ int main() {
     add_history(input);
     free(input);
 
+    title = getenv("lshprompt") ? getenv("lshprompt") : "lsh>";
     input = readline(title);
   }
 
