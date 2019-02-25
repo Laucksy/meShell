@@ -1,0 +1,12 @@
+meShell can be built using the provided Makefile. The make commands are:
+
+compile - create an executable in the /src folder with the needed linked libraries
+clean - remove the executable from the /src folder
+install - compiles the executable, moves the executable to /install/bin, gzips the
+	  man page, copies the man page to /install/man/man1
+
+The man page can be viewed from the root directory of meShell using the following command:
+	man -l install/man/man1/meShell.1.gz
+
+If the readline C library is not already installed on your machine, it must be installed with the following:
+	sudo apt-get install libreadline6 libreadline6-dev
