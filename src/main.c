@@ -7,6 +7,12 @@
 #include "handlers.h"
 
 int main() {
+  printf("Welcome to        _____ __         ____\n");
+  printf("   ____ ___  ___ / ___// /_  ___  / / /\n");
+  printf("  / __ `__ \\/ _ \\\\__ \\/ __ \\/ _ \\/ / /\n");
+  printf(" / / / / / /  __/__/ / / / /  __/ / /\n");
+  printf("/_/ /_/ /_/\\___/____/_/ /_/\\___/_/_/\n");
+
   char *title = getenv("lshprompt") ? getenv("lshprompt") : "lsh>";
   char *input;
 

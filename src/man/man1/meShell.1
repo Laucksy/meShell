@@ -1,0 +1,71 @@
+.TH meShell 1 "24 Feb 2019" "meShell 1.0.0" "meShell Manual"
+.nf
+-------------------------------------------------------------------------------
+                                 *******      *                 ***     ***
+                               *       ***  **                   ***     ***
+                              *         **  **                    **      **
+                              **        *   **                    **      **
+                               ***          **                    **      **
+*** **** ****       ***       ** ***        **  ***      ***      **      **
+ *** **** ***  *   * ***       *** ***      ** * ***    * ***     **      **
+  **  **** ****   *   ***        *** ***    ***   ***  *   ***    **      **
+  **   **   **   **    ***         *** ***  **     ** **    ***   **      **
+  **   **   **   ********            ** *** **     ** ********    **      **
+  **   **   **   *******              ** ** **     ** *******     **      **
+  **   **   **   **                    * *  **     ** **          **      **
+  **   **   **   ****    *   ***        *   **     ** ****    *   **      **
+  ***  ***  ***   *******   *  *********    **     **  *******    *** *   ***
+   ***  ***  ***   *****   *     *****       **    **   *****      ***     ***
+                           *                       *
+                            **                    *
+                                                 *
+                                                *
+-------------------------------------------------------------------------------
+.fi
+.SH NAME
+meShell \- shell for CS406 (Operating Systems) at Lafayette College, Spring 2019
+.SH SYNOPSIS
+.B meShell
+.SH DESCRIPTION
+.B meShell
+is a shell that interprets commands and executes them. meShell inherits environment
+variables from its parent process. The prompt is defaulted to "lsh>" but can be
+changed by setting the "lshprompt" environment variable. Environment variables can
+be set using an equals sign in the format "KEY=value". Environemtn variables can
+also be referenced using a dollar sign in the format "$KEY". meShell passes arguments
+to executed commands according to UNIX standards.
+
+meShell supports arbitrary numbers of pipes, using the "|" character, to direct
+output from one process to input of another. However, I/O redirection is not
+supported.
+
+meShell supports several of the process control mechanisms that other shells provide.
+Foreground jobs can be terminated using ctrl-C or stopped using ctrl-Z. Appending an
+ampersand (&) to the end of a command will run the command (and all piped commands)
+in the background.
+
+The following is a list of builtin commands supported by meShell.
+.br
+exit \- quits the shell and kills all running/stopped jobs
+.br
+cd \- changes the working directory of the shell
+.br
+bg <i> \- starts/restarts the job with job ID i in the background (no % prefix)
+.br
+fg <i> \- starts/restarts the job with job ID i in the foreground (no % prefix)
+.br
+jobs \- displays a list of running/stopped jobs, along with their status and job ID
+.br
+jsum \- displays a list of all jobs, along with their PID, status (exec, stop, ok, error, abort),
+the elapsed time of the job (wall time), and the command the job executed
+
+Extra features implemented include the ability to edit lines without backspacing
+(using the left/right arrow keys). Also, using the up/down arrows provides access
+to the history of commands from the current session. The "cd" builtin command and
+the "stop" status in the jsum table are also extra features.
+.SH OPTIONS
+There are no options available.
+.SH AUTHORS / CONTRIBUTORS
+Erik Laucks, lauckse@lafayette.edu
+.SH "SEE ALSO"
+.BR bash (1)
